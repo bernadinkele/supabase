@@ -1,0 +1,302 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+import StepHikeCompact from '~/components/StepHikeCompact'
+import { Accordion } from 'ui'
+
+export const meta = {
+  title: 'Setting up Server-Side Auth for Next.js',
+  sidebar_label: 'Next.js guide',
+}
+
+Next.js comes in two flavors: the [App Router](https://nextjs.org/docs/app) and the [Pages Router](https://nextjs.org/docs/pages). You can set up Server-Side Auth with either strategy. You can even use both in the same application.
+
+<Tabs scrollable size="small" type="underlined" defaultActiveId="app" queryGroup="router">
+
+<TabPanel id="app" label="App Router">
+
+<StepHikeCompact>
+
+<StepHikeCompact.Step step={1}>
+
+<StepHikeCompact.Details title="Install Supabase packages">
+
+Install the `@supabase/supabase-js` package and the helper `@supabase/ssr` package.
+
+</StepHikeCompact.Details>
+
+<StepHikeCompact.Code>
+
+```sh
+npm install @supabase/ssr @supabase/supabase-js
+```
+
+</StepHikeCompact.Code>
+
+</StepHikeCompact.Step>
+
+<StepHikeCompact.Step step={2}>
+
+<StepHikeCompact.Details title="Set up environment variables">
+
+Create a `.env.local` file in your project root directory.
+
+Fill in your `SUPABASE_URL` and `SUPABASE_ANON_KEY`, which you can get from your [project dashboard](https://supabase.com/dashboard/project/_/settings/api).
+
+</StepHikeCompact.Details>
+
+<StepHikeCompact.Code>
+
+```txt .env.local
+NEXT_PUBLIC_SUPABASE_URL=<your_supabase_project_url>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<your_supabase_anon_key>
+```
+
+</StepHikeCompact.Code>
+
+</StepHikeCompact.Step>
+
+<StepHikeCompact.Step step={3}>
+
+<StepHikeCompact.Details title="Write utility code to create Supabase clients">
+
+To access Supabase from your Next.js app, you need 3 different types of Supabase clients:
+
+1. **Server component client** - To access Supabase from server components, which run only on the server.
+2. **Client component client** - To access Supabase from client components, which run in the browser.
+3. **Middleware client** - To automatically refresh a user's Supabase auth token when it expires.
+
+Create a `utils/supabase` folder with a file for each type of client. Then copy the code for each client type.
+
+<Accordion
+  type="default"
+  openBehaviour="multiple"
+  chevronAlign="right"
+  justified
+  size="medium"
+  className="text-foreground-light mt-8 mb-6"
+>
+  <div className="border-b pb-3">
+    <Accordion.Item
+      header={<span className="text-foreground">Why do I need so many types of clients?</span>}
+      id="nextjs-clients"
+    >
+     
+      A Supabase client reads and sets cookies in order to access and update the user session data. Depending on where the client is used, it needs to interact with cookies in a different way:
+
+      - **Client component** - Only reads cookies and doesn't set them. Accesses the cookies from browser storage. This is the default behavior of `createBrowserClient`, so no extra configuration is needed. Behind the scenes, `createBrowserClient` reuses the same client instance if called multiple times, so don't worry about deduplicating the client yourself.
+      - **Server component** - Only reads cookies and doesn't set them. (This limitation is set by Next.js, which doesn't allow cookies to be updated from a server component.) Accesses the cookies via the Next.js `cookies()` API, which reads the cookies from the request. Server clients should always be created afresh each time, because they need the cookies from the request. That's why the `createClient` function in `server.ts` takes a `cookieStore` parameter.
+      - **Middleware** - Reads cookies and sets them. Accesses the cookies from the request. A common security measure for auth implementations, including Supabase Auth, is for the auth token to expire frequently. The refresh token must then be used to generate a new auth token. The Supabase client handles checking for expiring tokens and refreshing them automatically, but it then needs to write the new auth token to cookies. Because cookies can't be written from server components, a middleware client is used to update the cookie.
+
+    </Accordion.Item>
+
+  </div>
+  <div className="border-b mt-3 pb-3">
+    <Accordion.Item
+      header={<span className="text-foreground">What does the `cookies` option do?</span>}
+      id="client-storage-cookies"
+    >
+
+    The cookies option lets the Supabase client know to access the cookies, so it can read and write the user session data. To make the `@supabase/ssr` API framework-agnostic, the cookies methods aren't hard-coded. But you only need to set them up once, within your utilities. You can then reuse your utility functions whenever you need a Supabase client.
+
+    </Accordion.Item>
+
+  </div>
+</Accordion>
+
+</StepHikeCompact.Details>
+
+<StepHikeCompact.Code>
+
+<CH.Code>
+
+```ts utils/supabase/server.ts
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+
+export function createClient(cookieStore: ReturnType<typeof cookies>) {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          try {
+            cookieStore.set({ name, value, ...options })
+          } catch (error) {
+            // The `set` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
+          }
+        },
+        remove(name: string, options: CookieOptions) {
+          try {
+            cookieStore.set({ name, value: '', ...options })
+          } catch (error) {
+            // The `delete` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
+          }
+        },
+      },
+    }
+  )
+}
+```
+
+```ts utils/supabase/client.ts
+import { createBrowserClient } from '@supabase/ssr'
+
+export function createClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
+```
+
+```ts utils/supabase/middleware.ts
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { type NextRequest, NextResponse } from 'next/server'
+
+export function createClient(request: NextRequest) {
+  // Create an unmodified response
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  })
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          // If the cookie is updated, update the cookies for the request and response
+          request.cookies.set({
+            name,
+            value,
+            ...options,
+          })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({
+            name,
+            value,
+            ...options,
+          })
+        },
+        remove(name: string, options: CookieOptions) {
+          // If the cookie is removed, update the cookies for the request and response
+          request.cookies.set({
+            name,
+            value: '',
+            ...options,
+          })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({
+            name,
+            value: '',
+            ...options,
+          })
+        },
+      },
+    }
+  )
+
+  return { supabase, response }
+}
+```
+
+</CH.Code>
+
+</StepHikeCompact.Code>
+
+</StepHikeCompact.Step>
+
+<StepHikeCompact.Step step={4}>
+
+<StepHikeCompact.Details title="Hook up middleware">
+
+Create a `middleware.ts` file at the root of your project. When your app makes a server request, the middleware is run first, so long as the requested route matches the middleware matcher.
+
+Import the middleware client you made in the previous step, and use it to refresh the user session. This makes sure server components have a valid, non-expired access token when they make Supabase requests.
+
+</StepHikeCompact.Details>
+
+<StepHikeCompact.Code>
+
+```ts middleware.ts
+import { type NextRequest } from 'next/server'
+import { createClient } from '@/utils/supabase/middleware'
+
+export async function middleware(request: NextRequest) {
+  const { supabase, response } = createClient(request)
+
+  // Refresh session if expired - required for Server Components
+  await supabase.auth.getSession()
+
+  return response
+}
+
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * Feel free to modify this pattern to include more paths.
+     */
+    '/((?!_next/static|_next/image|favicon.ico).*)',
+  ],
+}
+```
+
+</StepHikeCompact.Code>
+
+</StepHikeCompact.Step>
+
+<StepHikeCompact.Step step={5}>
+
+<StepHikeCompact.Details title="Create a login page">
+
+</StepHikeCompact.Details>
+
+<StepHikeCompact.Code>
+
+</StepHikeCompact.Code>
+
+</StepHikeCompact.Step>
+
+</StepHikeCompact>
+
+</TabPanel>
+
+<TabPanel id="pages" label="Pages Router">
+
+</TabPanel>
+
+<TabPanel id="hybrid" label="Hybrid router strategies">
+
+You can use both the App and Pages Routers together.
+
+</TabPanel>
+
+</Tabs>
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} hideToc={true} />
+
+export default Page

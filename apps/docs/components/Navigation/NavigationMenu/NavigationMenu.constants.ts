@@ -586,6 +586,8 @@ export const auth = {
       url: undefined,
       items: [
         { name: 'Overview', url: '/guides/auth/server-side/overview' },
+        { name: 'Guide for Next.js', url: '/guides/auth/server-side/nextjs' },
+        { name: 'Guide for other frameworks', url: '/guides/auth/server-side/other-frameworks' },
         { name: 'Creating a client', url: '/guides/auth/server-side/creating-a-client' },
         {
           name: 'Email Auth with PKCE flow',
@@ -595,7 +597,7 @@ export const auth = {
           name: 'OAuth with PKCE flow',
           url: '/guides/auth/server-side/oauth-with-pkce-flow-for-ssr',
         },
-        { name: 'Server-side Rendering', url: '/guides/auth/server-side-rendering' },
+        { name: 'Custom SSR client', url: '/guides/auth/server-side/custom-ssr-client' },
         {
           name: 'Migrating from Auth Helpers',
           url: '/guides/auth/server-side/migrating-to-ssr-from-auth-helpers',

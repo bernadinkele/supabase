@@ -2,9 +2,11 @@ import { cn } from '@ui/lib/utils'
 import { cva } from 'class-variance-authority'
 import { PropsWithChildren } from 'react'
 import { Alert, AlertDescription, AlertTitle } from './../shadcn/ui/alert'
+
 export interface AdmonitionProps {
   type: 'note' | 'tip' | 'caution' | 'danger' | 'deprecation'
   label?: string
+  className?: string
 }
 
 const admonitionToAlertMapping: Record<
@@ -72,6 +74,7 @@ export const Admonition = ({
   type = 'note',
   label,
   children,
+  className,
 }: PropsWithChildren<AdmonitionProps>) => {
   const typeMapped = admonitionToAlertMapping[type]
 
@@ -80,7 +83,8 @@ export const Admonition = ({
       className={cn(
         'mb-2',
         admonitionSVG({ type: typeMapped }),
-        admonitionBase({ type: typeMapped })
+        admonitionBase({ type: typeMapped }),
+        className
       )}
       variant={typeMapped}
     >

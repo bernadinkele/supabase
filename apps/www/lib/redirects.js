@@ -2373,4 +2373,9 @@ module.exports = [
     source: '/guides/api/rest/joins-and-nesting',
     destination: '/guides/database/joins-and-nesting',
   },
+  {
+    permanent: true,
+    source: '/guides/auth/server-side-rendering',
+    destination: '/guides/auth/server-side/overview',
+  },
 ]

@@ -1,28 +1,55 @@
 import Layout from '~/layouts/DefaultGuideLayout'
+import { Accordion } from 'ui'
 
 export const meta = {
   id: 'index',
-  title: 'Server-Side Auth Overview',
-  description: 'Configure Supabase Auth to use Cookies',
+  title: 'Server-Side Auth',
+  subtitle: 'Configure Supabase Auth for a server-side framework',
   sidebar_label: 'Overview',
 }
 
-When using Supabase with server-side languages and frameworks - such as Next.js, SvelteKit and Remix - it is important to configure your Supabase client to use cookies for storing user sessions. We have developed an `@supabase/ssr` package to make this process as simple as possible. This package is currently in `beta`. Adoption is recommended but be aware that the API is still unstable and may have breaking changes in the future.
+Server-side frameworks, such as Next.js, SvelteKit, and Remix, run code on both the client and the server. For Supabase to work from both browser and server, you must configure your Supabase client to store user sessions using cookies. You can use the `@supabase/ssr` helper package to do this.
 
+<<<<<<< HEAD
 ## Framework quickstarts
+||||||| parent of 3be940d9b2 (update ssr auth guides)
+<Admonition type="note">
 
-<div className="grid lg:grid-cols-12 gap-6 not-prose">
-  {quickstarts.map((item) => {
-    return (
-      <Link href={`${item.href}`} key={item.title} passHref className={'col-span-4'}>
-        <GlassPanel title={item.title} span="col-span-6" background={false} icon={item.icon}>
-          {item.description}
-        </GlassPanel>
-      </Link>
-    )
-  })}
-</div>
+If you're currently using the [Auth Helpers package](https://github.com/supabase/auth-helpers), the [docs are still available](/docs/guides/auth/auth-helpers), however we recommend migrating to the new `@supabase/ssr` package as this will be the recommended path moving forward.
 
+</Admonition>
+
+## Framework Quickstarts
+=======
+<Admonition type="caution">
+
+The `@supabase/ssr` package is in beta. We recommend its use, but there might be breaking changes.
+
+If you don't want to use `@supabase/ssr`, you can [create a custom SSR client](/docs/guides/auth/server-side/custom-ssr-client). This is only recommended for advanced users.
+
+If you're using the old Auth Helpers package, the [Auth Helpers docs](/docs/guides/auth/auth-helpers) are still available, but we recommend migrating to `@supabase/ssr`.
+
+</Admonition>
+
+<Accordion
+  type="default"
+  openBehaviour="multiple"
+  chevronAlign="right"
+  justified
+  size="medium"
+  className="text-foreground-light mt-8 mb-6"
+  >
+    <div className="border-b pb-3">
+      <Accordion.Item
+        header={<span className="text-foreground font-bold">Server-side frameworks vs. client-only frameworks</span>}
+        id="server-vs-client"
+      >
+        A server-side framework is more accurately a hybrid framework. It contains both client-side code, which runs on your users' browsers, and server-side code. Server-side code runs on a server, which can be hosted for you in the cloud or run on your own hardware.
+>>>>>>> 3be940d9b2 (update ssr auth guides)
+
+        A client-only framework only contains client-side (browser) code.
+
+<<<<<<< HEAD
 <Admonition type="note" className="mt-2">
 
 If you're currently using the [Auth Helpers package](https://github.com/supabase/auth-helpers), the [docs are still available](/docs/guides/auth/auth-helpers), however we recommend migrating to the new `@supabase/ssr` package as this will be the recommended path moving forward.
@@ -30,21 +57,24 @@ If you're currently using the [Auth Helpers package](https://github.com/supabase
 </Admonition>
 
 ## Next steps
+||||||| parent of 3be940d9b2 (update ssr auth guides)
+## Next steps
+=======
+        Because a client-only framework only runs in the browser, it can use the browser's local storage to store the user session. This is the default mode when creating a Supabase client with the JavaScript SDK.
+>>>>>>> 3be940d9b2 (update ssr auth guides)
 
-- [Create a Supabase client for SSR](/docs/guides/auth/server-side/creating-a-client)
-- [Email Auth with PKCE flow for SSR](/docs/guides/auth/server-side/email-based-auth-with-pkce-flow-for-ssr)
-- [OAuth with PKCE flow for SSR](/docs/guides/auth/server-side/oauth-with-pkce-flow-for-ssr)
-- [Learn more about SSR](/docs/guides/auth/server-side-rendering)
+        A hybrid framework also contains client-side code. If you only ever access Supabase from the client, you can continue to create a Supabase client using the client-only method. But this prevents you from using the full power of your hybrid framework, such as server-side HTML rendering of personalized content, or server-side access control to authenticated routes.
 
-export const quickstarts = [
-  {
-    title: 'Next.js',
-    href: '/guides/auth/quickstarts/nextjs',
-    description:
-      'Automatically configure Supabase to use cookies, making your user and their session available on the client and server.',
-    icon: '/docs/img/icons/nextjs-icon',
-  },
-]
+        It you want to access Supabase from the server, you can't use local storage to store the session anymore. The server doesn't have access to the browser's local storage. You must configure your Supabase clients to store the session in a cookie instead. The cookie is passed back and forth between client and server, and is accessible from both.
+      </Accordion.Item>
+    </div>
+
+</Accordion>
+
+## Get started with Server-Side Auth
+
+- [Server-Side Auth for Next.js](/docs/guides/auth/server-side/nextjs)
+- [Server-Side Auth for other frameworks](/docs/guides/auth/server-side/other-frameworks)
 
 export const Page = ({ children }) => <Layout meta={meta} children={children} />
 
