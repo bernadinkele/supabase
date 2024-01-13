@@ -26,7 +26,7 @@ Install the `@supabase/supabase-js` package and the helper `@supabase/ssr` packa
 <StepHikeCompact.Code>
 
 ```sh
-npm install @supabase/ssr @supabase/supabase-js
+npm install @supabase/supabase-js @supabase/ssr
 ```
 
 </StepHikeCompact.Code>
@@ -58,11 +58,11 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<your_supabase_anon_key>
 
 <StepHikeCompact.Details title="Write utility code to create Supabase clients">
 
-To access Supabase from your Next.js app, you need 3 different types of Supabase clients:
+To access Supabase from your Next.js app, you need 3 types of Supabase clients:
 
-1. **Server component client** - To access Supabase from server components, which run only on the server.
 2. **Client component client** - To access Supabase from client components, which run in the browser.
-3. **Middleware client** - To automatically refresh a user's Supabase auth token when it expires.
+1. **Server component client** - To access Supabase from server components, which run only on the server.
+1. **Server action client** - To access Supabase from server actions and route handlers. Unlike server components, these have write access to cookies.
 
 Create a `utils/supabase` folder with a file for each type of client. Then copy the code for each client type.
 
@@ -83,8 +83,8 @@ Create a `utils/supabase` folder with a file for each type of client. Then copy 
       A Supabase client reads and sets cookies in order to access and update the user session data. Depending on where the client is used, it needs to interact with cookies in a different way:
 
       - **Client component** - Only reads cookies and doesn't set them. Accesses the cookies from browser storage. This is the default behavior of `createBrowserClient`, so no extra configuration is needed. Behind the scenes, `createBrowserClient` reuses the same client instance if called multiple times, so don't worry about deduplicating the client yourself.
-      - **Server component** - Only reads cookies and doesn't set them. (This limitation is set by Next.js, which doesn't allow cookies to be updated from a server component.) Accesses the cookies via the Next.js `cookies()` API, which reads the cookies from the request. Server clients should always be created afresh each time, because they need the cookies from the request. That's why the `createClient` function in `server.ts` takes a `cookieStore` parameter.
-      - **Middleware** - Reads cookies and sets them. Accesses the cookies from the request. A common security measure for auth implementations, including Supabase Auth, is for the auth token to expire frequently. The refresh token must then be used to generate a new auth token. The Supabase client handles checking for expiring tokens and refreshing them automatically, but it then needs to write the new auth token to cookies. Because cookies can't be written from server components, a middleware client is used to update the cookie.
+      - **Server component** - Only reads cookies and doesn't set them. (This limitation is set by Next.js, which doesn't allow cookies to be updated from a server component.) Accesses the cookies via the Next.js `cookies()` API, which reads the cookies from the request. Server clients should always be created afresh each time, because they need the cookies from the request.
+      - **Server action or route handler** - Reads cookies and sets them. Accesses the cookies via the Next.js `cookies()` API, which reads the cookies from the request. Server action clients should always be created afresh each time, because they need the cookies from the request.
 
     </Accordion.Item>
 
@@ -95,7 +95,7 @@ Create a `utils/supabase` folder with a file for each type of client. Then copy 
       id="client-storage-cookies"
     >
 
-    The cookies option lets the Supabase client know to access the cookies, so it can read and write the user session data. To make the `@supabase/ssr` API framework-agnostic, the cookies methods aren't hard-coded. But you only need to set them up once, within your utilities. You can then reuse your utility functions whenever you need a Supabase client.
+    The cookies option lets the Supabase client know to access the cookies, so it can read and write the user session data. To make `@supabase/ssr` framework-agnostic, the cookies methods aren't hard-coded. But you only need to set them up once. You can then reuse your utility functions whenever you need a Supabase client.
 
     </Accordion.Item>
 
@@ -106,44 +106,7 @@ Create a `utils/supabase` folder with a file for each type of client. Then copy 
 
 <StepHikeCompact.Code>
 
-<CH.Code>
-
-```ts utils/supabase/server.ts
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { cookies } from 'next/headers'
-
-export function createClient(cookieStore: ReturnType<typeof cookies>) {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          try {
-            cookieStore.set({ name, value, ...options })
-          } catch (error) {
-            // The `set` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
-        },
-        remove(name: string, options: CookieOptions) {
-          try {
-            cookieStore.set({ name, value: '', ...options })
-          } catch (error) {
-            // The `delete` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
-        },
-      },
-    }
-  )
-}
-```
+<CH.Code className="min-h-[34rem]">
 
 ```ts utils/supabase/client.ts
 import { createBrowserClient } from '@supabase/ssr'
@@ -156,12 +119,79 @@ export function createClient() {
 }
 ```
 
-```ts utils/supabase/middleware.ts
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { type NextRequest, NextResponse } from 'next/server'
+```ts utils/supabase/server.ts
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
-export function createClient(request: NextRequest) {
-  // Create an unmodified response
+export function createClient() {
+  const cookieStore = cookies()
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value
+        },
+      },
+    }
+  )
+}
+```
+
+```ts utils/supabase/actions.ts
+import { type CookieOptions, createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+
+export function createClient() {
+  const cookieStore = cookies()
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          cookieStore.set({ name, value, ...options })
+        },
+        remove(name: string, options: CookieOptions) {
+          cookieStore.set({ name, value: '', ...options })
+        },
+      },
+    }
+  )
+}
+```
+
+</CH.Code>
+
+</StepHikeCompact.Code>
+
+</StepHikeCompact.Step>
+
+<StepHikeCompact.Step step={4}>
+
+<StepHikeCompact.Details title="Hook up middleware">
+
+Create a `middleware.ts` file at the root of your project.
+
+Since Server Components can't write cookies, you need middleware to refresh expired auth tokens before your Server Components read them. Copy the code to refresh the auth token whenever it's expired.
+
+Add a matcher so the middleware doesn't run on routes that don't access Supabase.
+
+</StepHikeCompact.Details>
+
+<StepHikeCompact.Code>
+
+```ts middleware.ts
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
+
+export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -177,7 +207,6 @@ export function createClient(request: NextRequest) {
           return request.cookies.get(name)?.value
         },
         set(name: string, value: string, options: CookieOptions) {
-          // If the cookie is updated, update the cookies for the request and response
           request.cookies.set({
             name,
             value,
@@ -195,7 +224,6 @@ export function createClient(request: NextRequest) {
           })
         },
         remove(name: string, options: CookieOptions) {
-          // If the cookie is removed, update the cookies for the request and response
           request.cookies.set({
             name,
             value: '',
@@ -216,36 +244,6 @@ export function createClient(request: NextRequest) {
     }
   )
 
-  return { supabase, response }
-}
-```
-
-</CH.Code>
-
-</StepHikeCompact.Code>
-
-</StepHikeCompact.Step>
-
-<StepHikeCompact.Step step={4}>
-
-<StepHikeCompact.Details title="Hook up middleware">
-
-Create a `middleware.ts` file at the root of your project. When your app makes a server request, the middleware is run first, so long as the requested route matches the middleware matcher.
-
-Import the middleware client you made in the previous step, and use it to refresh the user session. This makes sure server components have a valid, non-expired access token when they make Supabase requests.
-
-</StepHikeCompact.Details>
-
-<StepHikeCompact.Code>
-
-```ts middleware.ts
-import { type NextRequest } from 'next/server'
-import { createClient } from '@/utils/supabase/middleware'
-
-export async function middleware(request: NextRequest) {
-  const { supabase, response } = createClient(request)
-
-  // Refresh session if expired - required for Server Components
   await supabase.auth.getSession()
 
   return response
@@ -273,15 +271,214 @@ export const config = {
 
 <StepHikeCompact.Details title="Create a login page">
 
+Create a login page for your app.
+
+This example uses Server Actions.
+
+Since Supabase is being called from an Action, use the client defined in `@/utils/supabase/actions.ts`.
+
 </StepHikeCompact.Details>
 
 <StepHikeCompact.Code>
+
+<CH.Code className="min-h-[34rem]">
+
+```ts app/login/page.tsx
+import { login, signup } from './actions'
+
+export default function LoginPage() {
+  return (
+    <form>
+      <label htmlFor="email">Email:</label>
+      <input id="email" name="email" type="email" required />
+      <label htmlFor="password">Password:</label>
+      <input id="password" name="password" type="password" required />
+      <button formAction={login}>Log in</button>
+      <button formAction={signup}>Sign up</button>
+    </form>
+  )
+}
+```
+
+```ts app/login/actions.ts
+'use server'
+
+import { createClient } from '@/utils/supabase/actions'
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
+import { z } from 'zod'
+
+const schema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+})
+
+export async function login(formData: FormData) {
+  const supabase = createClient()
+
+  let data
+  try {
+    data = schema.parse({
+      email: formData.get('email'),
+      password: formData.get('password'),
+    })
+  } catch {
+    redirect('/error')
+  }
+
+  const { error } = await supabase.auth.signInWithPassword(data)
+
+  if (error) {
+    redirect('/error')
+  }
+
+  revalidatePath('/', 'layout')
+  redirect('/')
+}
+
+export async function signup(formData: FormData) {
+  const supabase = createClient()
+
+  let data
+  try {
+    data = schema.parse({
+      email: formData.get('email'),
+      password: formData.get('password'),
+    })
+  } catch {
+    redirect('/error')
+  }
+
+  const { error } = await supabase.auth.signUp(data)
+
+  if (error) {
+    redirect('/error')
+  }
+
+  revalidatePath('/', 'layout')
+  redirect('/')
+}
+```
+
+</CH.Code>
+
+</StepHikeCompact.Code>
+
+</StepHikeCompact.Step>
+
+<StepHikeCompact.Step step={6}>
+
+<StepHikeCompact.Details title="Access user info from Server Component">
+
+Server Components can read cookies, so you can use the auth status and user info.
+
+Since you're calling Supabase from a Server Component, use the client created in `@/utils/supabase/server.ts`.
+
+Create a `private` page that users can only access if they're logged in. The page displays their email.
+
+</StepHikeCompact.Details>
+
+<StepHikeCompact.Code>
+
+```ts app/private/page.tsx
+import { createClient } from '@/utils/supabase/server'
+import { redirect } from 'next/navigation'
+
+export default async function PrivatePage() {
+  const supabase = createClient()
+
+  const { data, error } = await supabase.auth.getUser()
+  if (error || !data.user) {
+    redirect('/')
+  }
+
+  return <p>Hello {data.user.email}</p>
+}
+```
+
+</StepHikeCompact.Code>
+
+</StepHikeCompact.Step>
+
+<StepHikeCompact.Step step={7}>
+
+<StepHikeCompact.Details title="Access Supabase from a client component">
+
+You can also access Supabase from a Client Component. For example, you can upload a file directly to Storage.
+
+Since you're calling Supabase from a Client Component, use the Supabase client from `@/utils/supabase/client.ts`.
+
+In your dashboard, go to [**Storage**](https://supabase.com/dashboard/project/_/storage/buckets) and create a bucket named `test`.
+
+Go to **Policies** and create a new policy for the `test` bucket using the example SQL. This policy allows authenticated users to upload files to the bucket.
+
+Then copy the code to create the file upload component.
+
+</StepHikeCompact.Details>
+
+<StepHikeCompact.Code>
+
+<CH.Code className="min-h-96">
+
+```sql Policy
+CREATE POLICY "Allow authenticated users to upload files 2487m_0"
+    ON storage.objects
+    FOR INSERT
+    TO authenticated
+    WITH CHECK (bucket_id = 'test');
+```
+
+```ts FileUpload.tsx
+'use client'
+
+import { createClient } from '@/utils/supabase/client'
+import { useState } from 'react'
+
+export function FileUpload() {
+  const [file, setFile] = useState<File>()
+
+  function upload() {
+    if (!file) return
+    const supabase = createClient()
+    supabase.storage
+      .from('test')
+      .upload(file.name, file)
+      .then(({ error }) => {
+        if (error) {
+          console.error(error)
+        } else {
+          alert('File successfully uploaded!')
+        }
+      })
+  }
+
+  return (
+    <>
+      <input type="file" onChange={(e) => setFile(e.target.files?.[0])} />
+      <button onClick={upload}>Upload</button>
+    </>
+  )
+}
+```
+
+</CH.Code>
 
 </StepHikeCompact.Code>
 
 </StepHikeCompact.Step>
 
 </StepHikeCompact>
+
+## Congratulations
+
+You're done! To recap, you've successfully:
+
+- Called Supabase from a Server Action
+- Called Supabase from a Server Component
+- Called Supabase from a Client Component
+- Set up middleware to automatically refresh the Supabase Auth session
+
+You can now use any Supabase features from your client or server code!
 
 </TabPanel>
 

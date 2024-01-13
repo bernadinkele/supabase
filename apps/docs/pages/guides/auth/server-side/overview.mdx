@@ -10,17 +10,8 @@ export const meta = {
 
 Server-side frameworks, such as Next.js, SvelteKit, and Remix, run code on both the client and the server. For Supabase to work from both browser and server, you must configure your Supabase client to store user sessions using cookies. You can use the `@supabase/ssr` helper package to do this.
 
-<<<<<<< HEAD
 ## Framework quickstarts
-||||||| parent of 3be940d9b2 (update ssr auth guides)
-<Admonition type="note">
 
-If you're currently using the [Auth Helpers package](https://github.com/supabase/auth-helpers), the [docs are still available](/docs/guides/auth/auth-helpers), however we recommend migrating to the new `@supabase/ssr` package as this will be the recommended path moving forward.
-
-</Admonition>
-
-## Framework Quickstarts
-=======
 <Admonition type="caution">
 
 The `@supabase/ssr` package is in beta. We recommend its use, but there might be breaking changes.
@@ -45,23 +36,8 @@ If you're using the old Auth Helpers package, the [Auth Helpers docs](/docs/guid
         id="server-vs-client"
       >
         A server-side framework is more accurately a hybrid framework. It contains both client-side code, which runs on your users' browsers, and server-side code. Server-side code runs on a server, which can be hosted for you in the cloud or run on your own hardware.
->>>>>>> 3be940d9b2 (update ssr auth guides)
 
-        A client-only framework only contains client-side (browser) code.
-
-<<<<<<< HEAD
-<Admonition type="note" className="mt-2">
-
-If you're currently using the [Auth Helpers package](https://github.com/supabase/auth-helpers), the [docs are still available](/docs/guides/auth/auth-helpers), however we recommend migrating to the new `@supabase/ssr` package as this will be the recommended path moving forward.
-
-</Admonition>
-
-## Next steps
-||||||| parent of 3be940d9b2 (update ssr auth guides)
-## Next steps
-=======
-        Because a client-only framework only runs in the browser, it can use the browser's local storage to store the user session. This is the default mode when creating a Supabase client with the JavaScript SDK.
->>>>>>> 3be940d9b2 (update ssr auth guides)
+        A client-only framework only contains client-side (browser) code. Because a client-only framework only runs in the browser, it can use the browser's local storage to store the user session. This is the default mode when creating a Supabase client with the JavaScript SDK.
 
         A hybrid framework also contains client-side code. If you only ever access Supabase from the client, you can continue to create a Supabase client using the client-only method. But this prevents you from using the full power of your hybrid framework, such as server-side HTML rendering of personalized content, or server-side access control to authenticated routes.
 
